@@ -34,6 +34,9 @@
 #define FOSC_RTC32		1024
 static volatile bool	countingCompleted;
 static void prvSleepExactTime( portTickType xExpectedIdleTime );
+
+void vApplicationSleep( TickType_t xExpectedIdleTime );
+#define portSUPPRESS_TICKS_AND_SLEEP( xIdleTime ) vApplicationSleep( xIdleTime )
 /*-----------------------------------------------------------
  * Implementation of functions defined in portable.h for the AVR XMEGA port.
  *----------------------------------------------------------*/

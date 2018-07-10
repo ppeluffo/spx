@@ -24,7 +24,7 @@ void NVM_readID( char *str )
 //	}
 
 //	snprintf( str, 32 ,"%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\r\n",signature[0],signature[1],signature[2],signature[3],signature[4],signature[5],signature[6],signature[7],signature[8],signature[9],signature[10]  );
-	FRTOS_snprintf( str, 32 ,"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\r\n",signature[0],signature[1],signature[2],signature[3],signature[4],signature[5],signature[6],signature[7],signature[8],signature[9],signature[10]  );
+//	FRTOS_snprintf( str, 32 ,"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\r\n",signature[0],signature[1],signature[2],signature[3],signature[4],signature[5],signature[6],signature[7],signature[8],signature[9],signature[10]  );
 
 
 }
