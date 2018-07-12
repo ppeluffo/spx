@@ -6,35 +6,33 @@
  */
 
 
-#include <l_uarts.h>
-
+#include "l_uarts.h"
 #include "frtos-io.h"
+
+// En las operaciones de READ NO USAMOS SEMAFOROS YA QUE no tienen poerque ser
+// thread-safe ya que es una unica tarea que maneja las lecturas en forma exclusiva.
+// Para usar semaforo, deberiamos tener uno especifico de RX y otro de TX !!!
+
 //------------------------------------------------------------------------------------
-void CMD_write( const void *pvBuffer, const size_t xBytes )
+int CMD_write( const char *pvBuffer, const uint16_t xBytes )
 {
-	// En el SP6K el USB y BT operan juntos como I/O de la tarea de comando
+	// En el SPX el USB y BT operan juntos como I/O de la tarea de comando
 	// Para simplificar la escritura usamos esta funcion de modo que en el programa
 	// no tenemos que escribir en ambos handles.
 
-//uint16_t ticks_to_flush_queue;
+int bytes2wr = 0;
 
 	// SI la terminal esta desconectada salgo.
 	if ( IO_read_TERMCTL_PIN() == 1 )
-		return;
+		return(bytes2wr);
 
-//	USB_write( pvBuffer, xBytes );
-	frtos_ioctl (fdUSB,ioctlOBTAIN_BUS_SEMPH, NULL );
-	frtos_write( fdUSB, pvBuffer, xBytes );
-	frtos_ioctl (fdUSB,ioctlRELEASE_BUS_SEMPH, NULL);
-
-	//	ticks_to_flush_queue  = ( UART_BT_TXBUFFER_LEN * 10 * configTICK_RATE_HZ / 115200 )  + 1;
-	//vTaskDelay( ( TickType_t)( ticks_to_flush_queue ) );
-//	vTaskDelay( ( TickType_t)( 20 / portTICK_RATE_MS ) );
-
-
+	frtos_ioctl (fdUSB,ioctl_OBTAIN_BUS_SEMPH, NULL );
+	bytes2wr = frtos_write( fdUSB, pvBuffer, xBytes );
+	frtos_ioctl (fdUSB,ioctl_RELEASE_BUS_SEMPH, NULL);
+	return(bytes2wr);
 }
 //------------------------------------------------------------------------------------
-size_t CMD_read(  void *pvBuffer, const size_t xBytes )
+int CMD_read( char *pvBuffer, const uint16_t xBytes )
 {
 
 	// Como el USB y BT operan en paralelo para el modo comando, los caracteres pueden entrar
@@ -42,40 +40,18 @@ size_t CMD_read(  void *pvBuffer, const size_t xBytes )
 	// Lee caracteres de ambas FIFO de recepcion de la USB y BT
 	// No considera el caso que los handles sean QUEUES !!!!
 
-size_t xBytesReceived = 0U;
-portTickType xTicksToWait;
-xTimeOutType xTimeOut;
-UART_device_control_t *pUartUSB;
+int bytes2rd = 0;
 
-	pUartUSB = pdUART_USB.phDevice;
+	// SI la terminal esta desconectada salgo.
+	if ( IO_read_TERMCTL_PIN() == 1 )
+		return(bytes2rd);
 
-	xTicksToWait = pdUART_USB.xBlockTime;
-	xTicksToWait = 5;
-	vTaskSetTimeOutState( &xTimeOut );
+	// VER NOTA AL PPIO.SOBRE SEMAFOROS EN READ !!!!
 
-	/* Are there any more bytes to be received? */
-	while( xBytesReceived < xBytes )
-	{
-		/* Receive the next character. */
-		// Los FIFO no tienen timeout, retornan enseguida
-		if(  ringBufferPop( pUartUSB->rxStruct, &((char *)pvBuffer)[ xBytesReceived ] ) == pdPASS )
-		{
-			xBytesReceived++;
-		} else {
-			// Espero xTicksToWait antes de volver a chequear
-			vTaskDelay( ( TickType_t)( xTicksToWait ) );
-//			uxSwitchBuffers(pUartUSB->rxStruct);
-//			uxSwitchBuffers(pUartBT->rxStruct);
-		}
-
-		/* Time out has expired ? */
-		if( xTaskCheckForTimeOut( &xTimeOut, &xTicksToWait ) != pdFALSE )
-		{
-			break;
-		}
-	}
-
-	return xBytesReceived;
+	//frtos_ioctl (fdUSB,ioctlOBTAIN_BUS_SEMPH, NULL );
+	bytes2rd = frtos_read( fdUSB, pvBuffer, xBytes );
+	//frtos_ioctl (fdUSB,ioctlRELEASE_BUS_SEMPH, NULL);
+	return(bytes2rd);
 
 }
 //------------------------------------------------------------------------------------
@@ -89,5 +65,81 @@ char cChar;
 
 	cChar = c;
 	CMD_write( &cChar, sizeof(char));
+}
+//------------------------------------------------------------------------------------
+// USB xCOM
+//------------------------------------------------------------------------------------
+int USB_write( const char *pvBuffer, const uint16_t xBytes )
+{
+int bytes2wr = 0;
+
+	// SI la terminal esta desconectada salgo.
+	if ( IO_read_TERMCTL_PIN() == 1 )
+		return(bytes2wr);
+
+	frtos_ioctl (fdUSB,ioctl_OBTAIN_BUS_SEMPH, NULL );
+	bytes2wr = frtos_write( fdUSB, pvBuffer, xBytes );
+	frtos_ioctl (fdUSB,ioctl_RELEASE_BUS_SEMPH, NULL);
+	return(bytes2wr);
+
+}
+//------------------------------------------------------------------------------------
+int USB_read( char *pvBuffer, const uint16_t xBytes )
+{
+int bytes2rd = 0;
+
+	// SI la terminal esta desconectada salgo.
+	if ( IO_read_TERMCTL_PIN() == 1 )
+		return(bytes2rd);
+
+	bytes2rd = frtos_read( fdUSB, pvBuffer, xBytes );
+	return(bytes2rd);
+
+}
+//------------------------------------------------------------------------------------
+void USB_flushRX(void)
+{
+	frtos_ioctl( fdUSB, ioctl_UART_CLEAR_RX_BUFFER, NULL );
+}
+//------------------------------------------------------------------------------------
+void USB_flushTX(void)
+{
+	frtos_ioctl (fdUSB, ioctl_OBTAIN_BUS_SEMPH, NULL );
+	frtos_ioctl( fdUSB, ioctl_UART_CLEAR_TX_BUFFER, NULL );
+	frtos_ioctl (fdUSB, ioctl_RELEASE_BUS_SEMPH, NULL);
+}
+//------------------------------------------------------------------------------------
+// GPRS xCOM
+//------------------------------------------------------------------------------------
+int GPRS_write( const char *pvBuffer, const uint16_t xBytes )
+{
+int bytes2wr = 0;
+
+	frtos_ioctl (fdGPRS,ioctl_OBTAIN_BUS_SEMPH, NULL );
+	bytes2wr = frtos_write( fdGPRS, pvBuffer, xBytes );
+	frtos_ioctl (fdGPRS,ioctl_RELEASE_BUS_SEMPH, NULL);
+	return(bytes2wr);
+
+}
+//------------------------------------------------------------------------------------
+int GPRS_read( char *pvBuffer, const uint16_t xBytes )
+{
+int bytes2rd = 0;
+
+	bytes2rd = frtos_read( fdGPRS, pvBuffer, xBytes );
+	return(bytes2rd);
+
+}
+//------------------------------------------------------------------------------------
+void GPRS_flushRX(void)
+{
+	frtos_ioctl( fdGPRS, ioctl_UART_CLEAR_RX_BUFFER, NULL );
+}
+//------------------------------------------------------------------------------------
+void GPRS_flushTX(void)
+{
+	frtos_ioctl (fdGPRS, ioctl_OBTAIN_BUS_SEMPH, NULL );
+	frtos_ioctl( fdGPRS, ioctl_UART_CLEAR_TX_BUFFER, NULL );
+	frtos_ioctl (fdGPRS, ioctl_RELEASE_BUS_SEMPH, NULL);
 }
 //------------------------------------------------------------------------------------

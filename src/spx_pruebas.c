@@ -116,7 +116,7 @@ void puebas_ring_buffer(void)
 	FRTOS_snprintf_P( cmd_printfBuff,sizeof(cmd_printfBuff),PSTR("Volcar %d\r\n\0"),pos);
 	CMD_write(cmd_printfBuff, sizeof(cmd_printfBuff) );
 
-	CMD_write( &test_buffer, sizeof(test_buffer) );
+//	CMD_write( &test_buffer, sizeof(test_buffer) );
 
 	vTaskDelay( ( TickType_t)( 2000 / portTICK_RATE_MS ) );
 	}
@@ -145,7 +145,7 @@ void puebas2_ring_buffer(void)
 	FRTOS_snprintf_P( cmd_printfBuff,sizeof(cmd_printfBuff),PSTR("Volcar %d\r\n\0"),pos);
 	CMD_write(cmd_printfBuff, sizeof(cmd_printfBuff) );
 
-	CMD_write( &test_buffer, sizeof(test_buffer) );
+//	CMD_write( &test_buffer, sizeof(test_buffer) );
 }
 //------------------------------------------------------------------------------------
 void puebas3_ring_buffer(void)

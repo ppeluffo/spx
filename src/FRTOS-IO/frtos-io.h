@@ -16,8 +16,8 @@
  *
  */
 
-//#ifndef SRC_FRTOS_IO_FRTOS_IO_H_
-//#define SRC_FRTOS_IO_FRTOS_IO_H_
+#ifndef SRC_FRTOS_IO_FRTOS_IO_H_
+#define SRC_FRTOS_IO_FRTOS_IO_H_
 
 #include <stdlib.h>
 #include <avr/io.h>
@@ -25,13 +25,16 @@
 
 #include "FreeRTOS.h"
 #include "task.h"
-#include <semphr.h>
+#include "semphr.h"
 
 #include "../drivers/drv_uart_spx.h"
+#include "../drivers/drv_i2c_spx.h"
 
 // Identificador de los file descriptor.
 typedef enum {
 	fdUSB = 1,
+	fdGPRS = 2,
+	fdI2C = 3,
 
 } file_descriptor_t;
 
@@ -44,24 +47,48 @@ typedef struct {
 	                                        // La uart pertenece al driver. El periferico la apunta.
 } periferico_serial_port_t;
 
+// Estructuctura generica de un periferico tipo bus i2c.
+typedef struct {
+	file_descriptor_t fd;
+	SemaphoreHandle_t xBusSemaphore;		//
+	uint8_t xBlockTime;						// ticks to block in read operations. Set by ioctl
+	uint8_t devAddress;
+	uint8_t byteAddressLength;
+	uint16_t byteAddress;
+
+} periferico_i2c_port_t;
+
 // Periferico real.
-periferico_serial_port_t xComUSB;
+periferico_serial_port_t xComUSB, xComGPRS;
+periferico_i2c_port_t xBusI2C;
 
 
-#define ioctlOBTAIN_BUS_SEMPH		1
-#define ioctlRELEASE_BUS_SEMPH		2
-#define ioctlSET_TIMEOUT			3
-#define ioctl_UART_CLEAR_RX_BUFFER	4
-#define ioctl_UART_CLEAR_TX_BUFFER	5
+#define ioctl_OBTAIN_BUS_SEMPH			1
+#define ioctl_RELEASE_BUS_SEMPH			2
+#define ioctl_SET_TIMEOUT				3
+#define ioctl_UART_CLEAR_RX_BUFFER		4
+#define ioctl_UART_CLEAR_TX_BUFFER		5
+
+#define ioctl_I2C_SET_DEVADDRESS		6
+#define ioctl_I2C_SET_BYTEADDRESS		7
+#define ioctl_I2C_SET_BYTEADDRESSLENGTH	8
+
 
 //-----------------------------------------------------------------------
 int frtos_open( file_descriptor_t fd, uint32_t flags);
-int frtos_uart_open( periferico_serial_port_t *xCom, uint32_t flags);
+int frtos_uart_open( periferico_serial_port_t *xCom, file_descriptor_t fd, uart_id_t uart_id, uint32_t flags);
+int frtos_i2c_open( periferico_i2c_port_t *xI2c, file_descriptor_t fd, uint32_t flags);
 
-int frtos_write( file_descriptor_t fd ,const char *pvBuffer, const size_t xBytes );
-int frtos_uart_write( periferico_serial_port_t *xCom, const char *pvBuffer, const size_t xBytes );
+int frtos_write( file_descriptor_t fd ,const char *pvBuffer, const uint16_t xBytes );
+int frtos_uart_write( periferico_serial_port_t *xCom, const char *pvBuffer, const uint16_t xBytes );
+int frtos_i2c_write( periferico_i2c_port_t *xI2c, const char *pvBuffer, const uint16_t xBytes );
 
 int frtos_ioctl( file_descriptor_t fd, uint32_t ulRequest, void *pvValue );
 int frtos_uart_ioctl( periferico_serial_port_t *xCom, uint32_t ulRequest, void *pvValue );
+int frtos_i2c_ioctl( periferico_i2c_port_t *xI2c, uint32_t ulRequest, void *pvValue );
 
-//#endif /* SRC_FRTOS_IO_FRTOS_IO_H_ */
+int frtos_read( file_descriptor_t fd , char *pvBuffer, uint16_t xBytes );
+int frtos_uart_read( periferico_serial_port_t *xCom, char *pvBuffer, uint16_t xBytes );
+int frtos_i2c_read( periferico_i2c_port_t *xI2c, char *pvBuffer, uint16_t xBytes );
+
+#endif /* SRC_FRTOS_IO_FRTOS_IO_H_ */

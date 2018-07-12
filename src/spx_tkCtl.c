@@ -21,8 +21,8 @@ void tkCtl(void * pvParameters)
 	vTaskDelay( ( TickType_t)( 500 / portTICK_RATE_MS ) );
 uint8_t i = 0;
 
-//	FRTOS_snprintf_P( ctl_printfBuff,sizeof(ctl_printfBuff),PSTR("\r\nstarting tkControl..\r\n\0"));
-//	CMD_write(ctl_printfBuff, sizeof(ctl_printfBuff) );
+	FRTOS_snprintf_P( ctl_printfBuff,sizeof(ctl_printfBuff),PSTR("\r\nstarting tkControl..\r\n\0"));
+	CMD_write(ctl_printfBuff, sizeof(ctl_printfBuff) );
 
 
 	for( ;; )
@@ -37,9 +37,9 @@ uint8_t i = 0;
 
 		pv_tkCtl_wink_led();
 
-		i++;
-		FRTOS_snprintf_P( ctl_printfBuff,sizeof(ctl_printfBuff),PSTR("Contando++ %i\r\n\0"),i);
-		CMD_write(ctl_printfBuff, sizeof(ctl_printfBuff) );
+//		i++;
+//		FRTOS_snprintf_P( ctl_printfBuff,sizeof(ctl_printfBuff),PSTR("Contando++ %i\r\n\0"),i);
+//		CMD_write(ctl_printfBuff, sizeof(ctl_printfBuff) );
 
 //		puebas_ring_buffer();
 //		puebas2_ring_buffer();

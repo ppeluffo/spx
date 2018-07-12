@@ -16,7 +16,7 @@ uart_control_t *drv_uart_init( uart_id_t iUART, uint32_t baudrate )
 	// baudrate / frame format
 	// Enable TX,RX
 
-uart_control_t *pUart;
+uart_control_t *pUart = NULL;
 
 	switch(iUART) {
 	case iUART_USB:
@@ -29,6 +29,17 @@ uart_control_t *pUart;
 		uart_usb.uart_id = iUART_USB;
 		// Devuelvo la direccion de uart_usb para que la asocie al dispositvo USB el frtos.
 		pUart = (uart_control_t *)&uart_usb;
+		break;
+	case iUART_GPRS:
+		// Abro el puerto serial y fijo su velocidad
+		drv_uart_gprs_open(baudrate);
+		// Inicializo los ringBuffers que manejan el puerto. Son locales al driver.
+		rBufferCreateStatic( &uart_gprs.RXringBuffer, &gprs_rxStorage[0], GPRS_RXSTORAGE_SIZE );
+		rBufferCreateStatic( &uart_gprs.TXringBuffer, &gprs_txStorage[0], GPRS_RXSTORAGE_SIZE );
+		// Asigno el identificador
+		uart_gprs.uart_id = iUART_GPRS;
+		// Devuelvo la direccion de uart_gprs para que la asocie al dispositvo GPRS el frtos.
+		pUart = (uart_control_t *)&uart_gprs;
 		break;
 	}
 
@@ -50,6 +61,13 @@ uint8_t tempCTRLA;
 		tempCTRLA = (tempCTRLA & ~USART_DREINTLVL_gm) | USART_DREINTLVL_LO_gc;
 		USARTD0.CTRLA = tempCTRLA;
 		break;
+	case iUART_GPRS:
+		// low level, TXint enabled
+		/* Enable DRE interrupt. */
+		tempCTRLA = USARTE0.CTRLA;
+		tempCTRLA = (tempCTRLA & ~USART_DREINTLVL_gm) | USART_DREINTLVL_LO_gc;
+		USARTE0.CTRLA = tempCTRLA;
+		break;
 	}
 
 }
@@ -66,6 +84,13 @@ uint8_t tempCTRLA;
 		tempCTRLA = USARTD0.CTRLA;
 		tempCTRLA = (tempCTRLA & ~USART_DREINTLVL_gm) | USART_DREINTLVL_OFF_gc;
 		USARTD0.CTRLA = tempCTRLA;
+		break;
+	case iUART_GPRS:
+		// TXint disabled
+		// Espero que no halla nada en el DREG
+		tempCTRLA = USARTE0.CTRLA;
+		tempCTRLA = (tempCTRLA & ~USART_DREINTLVL_gm) | USART_DREINTLVL_OFF_gc;
+		USARTE0.CTRLA = tempCTRLA;
 		break;
 	}
 
@@ -179,6 +204,71 @@ char cChar;
 	cChar = USARTD0.DATA;
 
 	if( rBufferPokeFromISR( &uart_usb.RXringBuffer, &cChar ) ) {
+		taskYIELD();
+	}
+}
+//----------------------------------------------------------------------------------------
+void drv_uart_gprs_open( uint32_t baudrate )
+{
+	// El puerto del USB es PORTE:
+	// TXD pin = high
+	// TXD pin output
+	// baudrate / frame format
+	// Enable TX,RX
+
+uint8_t baudA, baudB, ctl;
+
+	PORTE.DIRSET   = PIN3_bm;	// PD3 (TXD0) as output.
+	PORTE.DIRCLR   = PIN2_bm;	// PD2 (RXD0) as input.
+	// USARTE0, 8 Data bits, No Parity, 1 Stop bit.
+	USARTE0.CTRLC = (uint8_t) USART_CHSIZE_8BIT_gc | USART_PMODE_DISABLED_gc;
+
+	ctl = USARTE0.CTRLB;
+	drv_set_baudrate( baudrate, &baudA, &baudB, &ctl);
+	USARTE0.BAUDCTRLA = baudA;
+	USARTE0.BAUDCTRLB = baudB;
+	USARTE0.CTRLB = ctl;
+
+	// Habilito la TX y RX
+	USARTE0.CTRLB |= USART_RXEN_bm;
+	USARTE0.CTRLB |= USART_TXEN_bm;
+
+	// Habilito la interrupcion de Recepcion ( low level )
+	// low level, RXint enabled
+	USARTE0.CTRLA |= _BV(4);	// RXCINTLVL_0 = 1
+	USARTE0.CTRLA &= ~(_BV(5));	// RXCINTLVL_1 = 0
+	//USARTE0.CTRLA = ( USARTE0.CTRLA & ~USART_RXCINTLVL_gm ) | USART_RXCINTLVL_LO_gc;
+
+	return;
+}
+//----------------------------------------------------------------------------------------
+// UART GPRS ISR:
+//----------------------------------------------------------------------------------------
+ISR(USARTE0_DRE_vect)
+{
+
+char cChar;
+int8_t res = false;
+
+	res = rBufferPop( &uart_gprs.TXringBuffer, (char *)&cChar );
+
+	if( res == true ) {
+		// Send the next character queued for Tx
+		USARTE0.DATA = cChar;
+	} else {
+		// Queue empty, nothing to send.
+		drv_uart_interruptOff(uart_gprs.uart_id);
+	}
+}
+//----------------------------------------------------------------------------------------
+ISR(USARTE0_RXC_vect)
+{
+
+char cChar;
+
+	cChar = USARTE0.DATA;
+
+	if( rBufferPokeFromISR( &uart_gprs.RXringBuffer, &cChar ) ) {
 		taskYIELD();
 	}
 }

@@ -12,7 +12,6 @@
 // INCLUDES
 //------------------------------------------------------------------------------------
 #include <avr/io.h>
-#include <stdlib.h>
 #include <avr/interrupt.h>
 #include <compat/deprecated.h>
 #include <avr/pgmspace.h>
@@ -24,36 +23,35 @@
 #include <stdbool.h>
 #include <avr/sleep.h>
 #include <avr_compiler.h>
-#include <clksys_driver.h>
-
-#include <FreeRTOS.h>
-
+#include "limits.h"
 #include <ctype.h>
-#include <FRTOS-IO/FRTOS_stdio.h>
-#include <FRTOS-IO/FRTOS-IO.h>
 #include <inttypes.h>
 
-#include <l_iopines.h>
-
+#include <FreeRTOS.h>
 #include <list.h>
-#include <pmic_driver.h>
 #include <queue.h>
 #include <semphr.h>
 #include <task.h>
-#include <timers.h>
+
+#include <FRTOS-IO/FRTOS_stdio.h>
+
+#include <pmic_driver.h>
 #include <TC_driver.h>
 #include <wdt_driver.h>
+#include <clksys_driver.h>
 
-#include "limits.h"
 
+#include <l_iopines.h>
 #include "frtos-io.h"
-#include "drivers/drv_uart_spx.h"
+
+#include "l_eeprom.h"
+//#include "l_uarts.h"
 
 //------------------------------------------------------------------------------------
 // DEFINES
 //------------------------------------------------------------------------------------
-#define SPX_FW_REV "0.0.13"
-#define SPX_FW_DATE "@ 20180711"
+#define SPX_FW_REV "0.0.20"
+#define SPX_FW_DATE "@ 20180712"
 
 #define SPX_HW_MODELO "TEST HW:xmega256A3B R1.0"
 #define SPX_FTROS_VERSION "FW:FRTOS10 TICKLESS"

@@ -105,6 +105,8 @@ int main( void )
 	initMCU();
 
 	frtos_open(fdUSB, 115200);
+	frtos_open(fdGPRS, 115200);
+	frtos_open(fdI2C, 100 );
 
 	// Creo los semaforos
 	sem_SYSVars = xSemaphoreCreateMutex();

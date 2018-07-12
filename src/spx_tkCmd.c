@@ -17,6 +17,10 @@
 static void pv_snprintfP_OK(void );
 static void pv_snprintfP_ERR(void);
 
+static void pv_cmd_rwEE(uint8_t cmd_mode );
+
+#define WR_CMD 0
+#define RD_CMD 1
 //----------------------------------------------------------------------------------------
 // FUNCIONES DE CMDMODE
 //----------------------------------------------------------------------------------------
@@ -39,7 +43,6 @@ void tkCmd(void * pvParameters)
 {
 
 uint8_t c;
-uint8_t ticks;
 
 ( void ) pvParameters;
 
@@ -56,8 +59,8 @@ uint8_t ticks;
 	FRTOS_CMD_register( "kill\0", cmdKillFunction );
 //	FRTOS_CMD_register( "test\0", cmdTestEEpromFunction );
 
-//	FRTOS_snprintf_P( cmd_printfBuff,sizeof(cmd_printfBuff),PSTR("starting tkCmd..\r\n\0"));
-//	CMD_write(cmd_printfBuff, sizeof(cmd_printfBuff) );
+	FRTOS_snprintf_P( cmd_printfBuff,sizeof(cmd_printfBuff),PSTR("starting tkCmd..\r\n\0"));
+	CMD_write(cmd_printfBuff, sizeof(cmd_printfBuff) );
 
 	//FRTOS_CMD_regtest();
 	// loop
@@ -66,7 +69,8 @@ uint8_t ticks;
 
 			c = '\0';	// Lo borro para que luego del un CR no resetee siempre el timer.
 			// el read se bloquea 50ms. lo que genera la espera.
-			while ( CMD_read( &c, 1 ) == 1 ) {
+			while ( CMD_read( (char *)&c, 1 ) == 1 ) {
+			//while ( frtos_read(fdUSB, &c, 1 ) == 1 ) {
 				FRTOS_CMD_process(c);
 			}
 	}
@@ -250,6 +254,15 @@ static void cmdResetFunction(void)
 static void cmdWriteFunction(void)
 {
 
+	FRTOS_CMD_makeArgv();
+
+	// EE
+	// write ee pos string
+	if (!strcmp_P( strupr(argv[1]), PSTR("EE\0"))) {
+		pv_cmd_rwEE(WR_CMD);
+		return;
+	}
+
 	// CMD NOT FOUND
 	FRTOS_snprintf_P( cmd_printfBuff,sizeof(cmd_printfBuff),PSTR("ERROR\r\nCMD NOT DEFINED\r\n\0"));
 	CMD_write( cmd_printfBuff, sizeof(cmd_printfBuff) );
@@ -259,6 +272,14 @@ static void cmdWriteFunction(void)
 static void cmdReadFunction(void)
 {
 
+	FRTOS_CMD_makeArgv();
+
+	// EE
+	// read ee address length
+	if (!strcmp_P( strupr(argv[1]), PSTR("EE\0"))) {
+		pv_cmd_rwEE(RD_CMD);
+		return;
+	}
 
 	// CMD NOT FOUND
 	FRTOS_snprintf_P( cmd_printfBuff,sizeof(cmd_printfBuff),PSTR("ERROR\r\nCMD NOT DEFINED\r\n\0"));
@@ -461,5 +482,48 @@ static void pv_snprintfP_ERR(void)
 {
 	FRTOS_snprintf_P( cmd_printfBuff,sizeof(cmd_printfBuff),PSTR("error\r\n\0"));
 	CMD_write(  cmd_printfBuff, sizeof(cmd_printfBuff) );
+}
+//------------------------------------------------------------------------------------
+static void pv_cmd_rwEE(uint8_t cmd_mode )
+{
+
+bool retS = false;
+uint8_t length = 0;
+char *p;
+
+	// read ee {pos} {lenght}
+	if ( cmd_mode == RD_CMD ) {
+		memset(cmd_printfBuff, '\0', sizeof(cmd_printfBuff));
+//		FreeRTOS_ioctl(&pdI2C,ioctlOBTAIN_BUS_SEMPH, NULL);
+		retS = EE_read( (uint32_t)(atol(argv[2])), cmd_printfBuff, (uint8_t)(atoi(argv[3]) ) );
+//		res = EE_read( (uint32_t)(atol(s0)), s1, (uint8_t)(atoi(s2)) );
+//		FreeRTOS_ioctl(&pdI2C,ioctlRELEASE_BUS_SEMPH, NULL);
+		if ( retS ) {
+			// El string leido lo devuelve en cmd_printfBuff por lo que le agrego el CR.
+			FRTOS_snprintf_P( &cmd_printfBuff[atoi(argv[3])], sizeof(cmd_printfBuff),PSTR( "\r\n\0"));
+			CMD_write( cmd_printfBuff, sizeof(cmd_printfBuff) );
+		}
+		retS ? pv_snprintfP_OK() : 	pv_snprintfP_ERR();
+		return;
+	}
+
+	// write ee pos string
+	if ( cmd_mode == WR_CMD ) {
+
+		// Calculamos el largo del texto a escribir en la eeprom.
+		p = argv[3];
+		while (*p != 0) {
+			p++;
+			length++;
+		}
+
+//		frtos_ioctl(&pdI2C,ioctlOBTAIN_BUS_SEMPH, NULL);
+		retS = EE_write( (uint32_t)(atol(argv[2])), argv[3], length );
+//		retS = EE_write( (uint32_t)(atol(argv[2])), cmd_printfBuff, 32 );
+//		FreeRTOS_ioctl(&pdI2C,ioctlRELEASE_BUS_SEMPH, NULL);
+		retS ? pv_snprintfP_OK() : 	pv_snprintfP_ERR();
+		return;
+	}
+
 }
 //------------------------------------------------------------------------------------

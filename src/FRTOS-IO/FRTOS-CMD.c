@@ -203,7 +203,7 @@ int i = 0;
 void pv_CMD_print_prompt(void)
 {
 	// Muestra el prompt
-//	CMD_write( "cmd>\0", sizeof("cmd>\0") );
+	CMD_write( "cmd>\0", sizeof("cmd>\0") );
 }
 //----------------------------------------------------------------------------------------
 void pv_CMD_print_error(void)
